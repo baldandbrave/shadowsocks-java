@@ -14,13 +14,14 @@ import org.bouncycastle.crypto.generators.HKDFBytesGenerator;
 import org.bouncycastle.crypto.params.HKDFParameters;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ReplayingDecoder;
 
 /**
  * AeadDecoder
  */
-public class AeadDecoder extends ReplayingDecoder<AeadStateEnum> {
+public class AeadDecoder extends ReplayingDecoder<AeadStateEnum>{
 
     private Cipher mambo;
     private AlgorithmParameterSpec mamboSpec;
@@ -40,7 +41,7 @@ public class AeadDecoder extends ReplayingDecoder<AeadStateEnum> {
 
     private short payloadLength;
 
-    public AeadDecoder (String method, int cryptMode, String textString) throws Exception {
+    public AeadDecoder () throws Exception {
         super(AeadStateEnum.READ_SALT);
         // TODO: constructor needs definition
         mambo = Cipher.getInstance("ChaCha20-Poly1305");
@@ -63,20 +64,20 @@ public class AeadDecoder extends ReplayingDecoder<AeadStateEnum> {
                 // read header, 2 bytes length, 16 bytes length tag
                 ByteBuffer header = ByteBuffer.allocate(headerLength + tagLength);
                 in.readBytes(header);
-                //in.nioBuffer(0, 2+16); expose the raw input ByteBuf as ByteBuffer, shouldn't use it cos it doesn't change read index.
+                // in.nioBuffer(0, 2+16); expose the raw input ByteBuf as ByteBuffer, shouldn't use it cos it doesn't change read index.
                 ByteBuffer headerOutput = decrypt(header);
-                payloadLength = headerOutput.getShort();
+                // TODO: if >0x3FFF throw error
+                payloadLength = headerOutput.getShort(); // payloadLength is a big-endian unsigned int capped at 0x3FFF
                 // https://docs.oracle.com/javase/7/docs/api/javax/crypto/Cipher.html#doFinal(java.nio.ByteBuffer,%20java.nio.ByteBuffer)
                 checkpoint(AeadStateEnum.READ_PAYLOAD);
                 break;
             case READ_PAYLOAD:
                 // read and decrypt payload
-                // TODO: if >0x3FFF throw error
                 ByteBuffer payload = ByteBuffer.allocate(payloadLength + tagLength);
                 in.readBytes(payload);
                 ByteBuffer payloadOutput = decrypt(payload);
                 checkpoint(AeadStateEnum.READ_LENGTH);
-                out.add(payloadOutput);
+                out.add(Unpooled.wrappedBuffer(payloadOutput));
             default:
                 break;
         }
@@ -84,6 +85,7 @@ public class AeadDecoder extends ReplayingDecoder<AeadStateEnum> {
     }
 
     public ByteBuffer decrypt(ByteBuffer in) throws Exception{
+        // TODO: ByteBuffer is big endian, nonce might need to be little endian unsigned int
         mamboSpec = new IvParameterSpec(ByteBuffer.allocate(nonce_length).putInt(nonce).array());
         mambo.init(Cipher.DECRYPT_MODE, mamboKey, mamboSpec);
         ByteBuffer out = ByteBuffer.allocate(mambo.getOutputSize(in.capacity()));

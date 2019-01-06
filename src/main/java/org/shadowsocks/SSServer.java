@@ -2,8 +2,6 @@ package org.shadowsocks;
 
 import java.net.InetAddress;
 
-import org.shadowsocks.crypto.Chacha20Poly1305;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
@@ -30,7 +28,7 @@ public class SSServer {
     private String method;
     private boolean obfs;
     private String obfs_param;
-    private int 
+
     public SSServer() {
         // TODO: read config and assign private value
         super();
@@ -55,7 +53,7 @@ public class SSServer {
                               @Override
                               public void initChannel (EpollServerSocketChannel ctx) {
                                   ctx.pipeline()
-                                     .addLast("decrypt", new Chacha20Poly1305(method, pre_shared_master_key));
+                                     .addLast("decrypt", null);
                               }
                           })
                           .bind(host, port)
