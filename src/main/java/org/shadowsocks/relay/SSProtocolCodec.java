@@ -4,27 +4,22 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.List;
 
-import org.shadowsocks.crypto.AeadStateEnum;
-
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.epoll.EpollSocketChannel;
-import io.netty.handler.codec.ReplayingDecoder;
-import io.netty.handler.proxy.Socks5ProxyHandler;
+import io.netty.handler.codec.ByteToMessageCodec;
 
 /**
- * tcpRelay
+ * SSProtocolCodec
  */
-public class tcpRelay extends ReplayingDecoder<relayStateEnum>{
+public class SSProtocolCodec extends ByteToMessageCodec<ByteBuf> {
 
     private InetSocketAddress targetSocketAddress;
 
     private Bootstrap relay = new Bootstrap();
 
-    public tcpRelay() {
-        super(relayStateEnum.READ_TARGET);
+    public SSProtocolCodec() {
+        // super(relayStateEnum.READ_TARGET);
     }
 
     @Override
@@ -48,7 +43,12 @@ public class tcpRelay extends ReplayingDecoder<relayStateEnum>{
         relay.group(ctx.channel().eventLoop())
              .channel(ctx.channel().getClass());
              // TODO: add options for proxy bootstrap
-        relay.handler();
         relay.connect(targetSocketAddress);
     }
+    
+    @Override
+    protected void encode(ChannelHandlerContext ctx, ByteBuf msg, ByteBuf out) throws Exception {
+        
+    }
+    
 }

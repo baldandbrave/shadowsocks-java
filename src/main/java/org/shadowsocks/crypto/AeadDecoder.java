@@ -1,5 +1,7 @@
 package org.shadowsocks.crypto;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.List;
@@ -41,8 +43,12 @@ public class AeadDecoder extends ReplayingDecoder<AeadStateEnum>{
 
     private short payloadLength;
 
+    private InetSocketAddress targetSocketAddress;
+    private boolean readProtocolDone;
+
     public AeadDecoder () throws Exception {
         super(AeadStateEnum.READ_SALT);
+        readProtocolDone = false;
         // TODO: constructor needs definition
         mambo = Cipher.getInstance("ChaCha20-Poly1305");
     }
@@ -76,8 +82,33 @@ public class AeadDecoder extends ReplayingDecoder<AeadStateEnum>{
                 ByteBuffer payload = ByteBuffer.allocate(payloadLength + tagLength);
                 in.readBytes(payload);
                 ByteBuffer payloadOutput = decrypt(payload);
-                checkpoint(AeadStateEnum.READ_LENGTH);
+                if (readProtocolDone) {
+                    checkpoint(AeadStateEnum.READ_LENGTH);
+                } else{
+                    checkpoint(AeadStateEnum.READ_PROTOCOL);
+                }
                 out.add(Unpooled.wrappedBuffer(payloadOutput));
+                break;
+            case READ_PROTOCOL:
+                byte hostType = in.readByte();
+                switch (hostType) {
+                    case 0x01:
+                        targetSocketAddress = new InetSocketAddress(InetAddress.getByAddress(in.readBytes(4).array()), in.readInt());
+                        break;
+                    case 0x02:
+                        short hostLength = in.readUnsignedByte();
+                        targetSocketAddress = new InetSocketAddress(in.readBytes(hostLength).toString(), in.readInt());
+                        break;
+                    case 0x03:
+                        targetSocketAddress = new InetSocketAddress(InetAddress.getByAddress(in.readBytes(16).array()), in.readInt());
+                        break;
+                    default:
+                        // TODO: throw error and close channel
+                        break;
+                }
+                readProtocolDone = true;
+                checkpoint(AeadStateEnum.READ_PAYLOAD);
+                break;
             default:
                 break;
         }
